@@ -1,4 +1,212 @@
+<script setup>
+import { Head, useForm } from "@inertiajs/vue3";
+import { ref, reactive, onMounted, computed, nextTick } from "vue";
+import { router } from '@inertiajs/vue3';
+import axios from 'axios';
+
+const form = useForm({
+    otp: '',
+});
+
+const isResending = ref(false);
+
+const otpDigits = reactive(['', '', '', '', '', '']);
+const props = defineProps({
+    otp_start_time: String,
+    student_id: String,
+    otp_email: String,
+    student_phone: String
+});
+
+const EXPIRE_SECONDS = 120;
+const timer = ref(EXPIRE_SECONDS);
+const expired = ref(false);
+let interval = null;
+
+const formattedTime = computed(() => {
+    const min = Math.floor(timer.value / 60).toString().padStart(1, '0');
+    const sec = (timer.value % 60).toString().padStart(2, '0');
+    return `${min}:${sec}`;
+});
+
+const getStorageKey = () => `otp_start_time_${props.student_id}`;
+const getExpireKey = () => `otp_expire_seconds_${props.student_id}`;
+
+const startTimer = (skipStorage = false) => {
+    if (interval) {
+        clearInterval(interval);
+    }
+
+    expired.value = false;
+
+    // Only set storage if not skipping (i.e., for new OTP)
+    if (!skipStorage) {
+        localStorage.setItem(getStorageKey(), new Date().toISOString());
+        localStorage.setItem(getExpireKey(), EXPIRE_SECONDS.toString());
+    }
+
+    interval = setInterval(() => {
+        if (timer.value > 0) {
+            timer.value--;
+        } else {
+            expired.value = true;
+            clearInterval(interval);
+            localStorage.removeItem(getStorageKey());
+            localStorage.removeItem(getExpireKey());
+        }
+    }, 1000);
+};
+
+const resendOtp = async () => {
+    isResending.value = true;
+    try {
+        const response = await axios.post('/student/resend-otp');
+
+        if (response.data.success) {
+            // Clear existing timer data
+            clearInterval(interval);
+            localStorage.removeItem(getStorageKey());
+            localStorage.removeItem(getExpireKey());
+
+            // Reset states
+            timer.value = EXPIRE_SECONDS;
+            expired.value = false;
+            otpDigits.fill(''); // Clear OTP inputs
+            form.clearErrors(); // Clear any form errors
+
+            // Start timer (this will set new storage)
+            startTimer();
+
+            nextTick(() => {
+                document.getElementById('otp-0')?.focus();
+            });
+        }
+    } catch (error) {
+        alert('Failed to resend OTP. Please try again.');
+        console.error(error);
+    } finally {
+        isResending.value = false;
+    }
+};
+
+const focusNext = (i, e) => {
+    if (e.inputType === 'deleteContentBackward') return;
+    if (otpDigits[i].length === 1 && i < 5) {
+        document.getElementById(`otp-${i + 1}`).focus();
+    }
+};
+
+const handlePaste = (event) => {
+    const pasteData = event.clipboardData.getData('text');
+    if (!/^\d{6}$/.test(pasteData)) return;
+
+    event.preventDefault();
+
+    for (let i = 0; i < 6; i++) {
+        otpDigits[i] = pasteData[i];
+    }
+
+    setTimeout(() => {
+        document.getElementById('otp-5')?.focus();
+    }, 10);
+};
+
+const handleSubmit = async () => {
+    form.otp = otpDigits.join('');
+
+    try {
+        const response = await axios.post('/student/verify-otp', {
+            otp: form.otp,
+            student_id: props.student_id,
+            purpose: 'student_auth'
+        });
+
+        if (response.data.success) {
+            // Clear local storage
+            localStorage.removeItem(getStorageKey());
+            localStorage.removeItem(getExpireKey());
+
+            // Clear interval
+            if (interval) {
+                clearInterval(interval);
+            }
+
+            // Redirect back to Details page with step 2
+            router.visit('/Details?step=2', {
+                method: 'get',
+                data: {
+                    studentData: response.data.student_data,
+                    parentData: response.data.parent_data
+                },
+                replace: true
+            });
+        }
+    } catch (error) {
+        if (error.response?.data?.error) {
+            form.setError('otp', error.response.data.error);
+        } else {
+            form.setError('otp', 'Verification failed. Please try again.');
+        }
+    }
+};
+
+onMounted(() => {
+    expired.value = false;
+
+    // Clear any existing interval
+    if (interval) {
+        clearInterval(interval);
+    }
+
+    const savedStartTime = localStorage.getItem(getStorageKey());
+    const savedExpireSeconds = localStorage.getItem(getExpireKey());
+
+    if (savedStartTime && savedExpireSeconds) {
+        // Existing OTP session - calculate remaining time
+        const startTime = new Date(savedStartTime);
+        const now = new Date();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        const remaining = parseInt(savedExpireSeconds) - elapsed;
+
+        if (remaining > 0) {
+            timer.value = remaining;
+            startTimer(true); // Skip setting new storage
+        } else {
+            timer.value = 0;
+            expired.value = true;
+        }
+    } else if (props.otp_start_time) {
+        // New OTP session from backend
+        const backendStartTime = new Date(props.otp_start_time);
+        const now = new Date();
+        const elapsed = Math.floor((now - backendStartTime) / 1000);
+        const remaining = EXPIRE_SECONDS - elapsed;
+
+        if (remaining > 0) {
+            timer.value = remaining;
+            // Set storage with backend time
+            localStorage.setItem(getStorageKey(), props.otp_start_time);
+            localStorage.setItem(getExpireKey(), EXPIRE_SECONDS.toString());
+            startTimer(true); // Skip setting new storage since we just set it
+        } else {
+            timer.value = 0;
+            expired.value = true;
+        }
+    } else {
+        // Fallback - start fresh timer
+        timer.value = EXPIRE_SECONDS;
+        startTimer();
+    }
+
+    // Focus first input
+    nextTick(() => {
+        document.getElementById('otp-0')?.focus();
+    });
+});
+</script>
+
 <template>
+    <Head title="USePass" />
     <div
         class="relative min-h-screen bg-cover bg-center flex flex-col items-center justify-center px-4"
         :style="{ backgroundImage: 'url(/images/bg_tmc.jpg)' }"
@@ -10,7 +218,7 @@
         <!-- Foreground content -->
         <div class="relative z-10 p-4 rounded-lg text-center max-w-lg w-full">
             <img
-                src="/images/logo1.png"
+                src="/images/Logo1.png"
                 alt="USePass Logo"
                 class="mx-auto mb-2 w-full max-w-[600px] h-100"
             />
@@ -19,53 +227,66 @@
                 USePass."
             </p>
             <h1 class="text-white font-extrabold text-base md:text-lg lg:text-4xl mb-6">
-                OTP Verification
+                Student Verification
             </h1>
             <p class="text-white italic text-base md:text-md lg:text-md mb-6">
-                Please Check Your Email.
+                Please Check Your Email for OTP.
+            </p>
+            <p class="text-white italic text-sm mb-6">
+                Student ID: {{ student_id }}
             </p>
 
             <!-- Wrapper for inputs and timer -->
             <div class="max-w-xs mx-auto relative">
-                <!-- Input boxes -->
-                <div class="flex justify-center space-x-2">
+                <div class="flex justify-center space-x-2 mb-8">
                     <input
-                        v-for="(char, index) in userId"
-                        :key="index"
-                        type="tel"
+                        v-for="(digit, i) in otpDigits"
+                        :key="i"
+                        v-model="otpDigits[i]"
+                        :id="`otp-${i}`"
                         maxlength="1"
+                        @input="focusNext(i, $event)"
+                        @paste="handlePaste($event)"
+                        type="tel"
                         class="w-12 h-12 text-center text-white text-xl rounded-md border border-white bg-white/10 backdrop-blur-md shadow-sm
-                   focus:outline-none focus:ring-2 focus:ring-white transition"
-                        v-model="userId[index]"
-                        @input="onInput(index)"
-                        @keydown.backspace="onBackspace(index, $event)"
+                               focus:outline-none focus:ring-2 focus:ring-white transition"
                         autocomplete="off"
                         placeholder="-"
-                        :ref="'input' + index"
+                        :disabled="expired"
                     />
                 </div>
 
-                <!-- Timer positioned outside bottom-right -->
-                <div
-                    class="absolute right-0 -bottom-7 text-sm text-yellow-300 font-semibold select-none"
-                    style="user-select: none;"
-                >
-                    {{ formattedTime }}
+                <!-- Timer positioned below inputs -->
+                <div class="text-center mb-4">
+                    <div class="text-sm text-yellow-300 font-semibold select-none">
+                        {{ formattedTime }}
+                    </div>
                 </div>
+
+                <!-- Submit button -->
+                <button
+                    @click="handleSubmit"
+                    :disabled="expired || otpDigits.join('').length !== 6"
+                    class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white px-4 py-2 rounded-md font-semibold transition"
+                >
+                    Verify OTP
+                </button>
             </div>
+        </div>
+
+        <div class="text-sm text-red-300 text-center mt-4 mb-4" v-if="form.errors.otp">
+            {{ form.errors.otp }}
         </div>
 
         <!-- Timeout message overlay -->
         <div
-            v-if="timeoutMessageVisible"
+            v-if="expired"
             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-80 z-50 px-4"
         >
             <div
                 class="bg-yellow-300/80 text-white rounded-xl p-8 max-w-sm w-full shadow-2xl text-center
     animate-scaleIn border-1 border-[#a00000] ring ring-[#b22222] ring-opacity-60 relative"
             >
-
-            <!-- Pulsating clock icon -->
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     class="mx-auto mb-6 h-14 w-14 text-[#760000] animate-pulse"
@@ -86,12 +307,12 @@
                 </p>
                 <div class="flex justify-center space-x-5">
                     <button
-                        @click.prevent="resendOtp"
+                        @click="resendOtp"
                         :disabled="isResending"
-                        class="bg-[#760000] text-[#FFFFFF] font-bold py-3 px-8 rounded-full shadow-lg
-        hover:bg-yellow-500 focus:outline-none focus:ring-4 focus:ring-yellow-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="text-sm text-blue-300 underline mt-2"
+                        :class="{ 'opacity-50 cursor-not-allowed': isResending }"
                     >
-                        Resend
+                        {{ isResending ? 'Sending...' : 'Resend OTP' }}
                     </button>
 
                     <div
@@ -102,92 +323,8 @@
                 </div>
             </div>
         </div>
-
     </div>
 </template>
-
-<script>
-export default {
-    name: "UserIDView",
-    data() {
-        return {
-            userId: ["", "", "", "", "", ""],
-            timer: 120,
-            timerInterval: null,
-            timeoutMessageVisible: false,
-            isResending: false, // track resend state
-        };
-    },
-    computed: {
-        formattedTime() {
-            const minutes = Math.floor(this.timer / 60)
-                .toString()
-                .padStart(2, "0");
-            const seconds = (this.timer % 60).toString().padStart(2, "0");
-            return `${minutes}:${seconds}`;
-        },
-    },
-    methods: {
-        onInput(index) {
-            this.userId[index] = this.userId[index].replace(/\D/g, "");
-            if (this.userId[index].length > 1) {
-                this.userId[index] = this.userId[index].slice(0, 1);
-            }
-            if (this.userId[index] && index < this.userId.length - 1) {
-                const nextInput = this.$refs["input" + (index + 1)];
-                if (nextInput && nextInput[0]) {
-                    nextInput[0].focus();
-                }
-            }
-        },
-        onBackspace(index, event) {
-            if (this.userId[index] === "" && index > 0) {
-                const prevInput = this.$refs["input" + (index - 1)];
-                if (prevInput && prevInput[0]) {
-                    prevInput[0].focus();
-                    event.preventDefault();
-                }
-            }
-        },
-        getUserIdString() {
-            return this.userId.join("");
-        },
-        startTimer() {
-            if (this.timerInterval) clearInterval(this.timerInterval);
-            this.timer = 120;
-            this.timeoutMessageVisible = false;
-            this.isResending = false;
-            this.timerInterval = setInterval(() => {
-                if (this.timer > 0) {
-                    this.timer--;
-                } else {
-                    clearInterval(this.timerInterval);
-                    this.timerInterval = null;
-                    this.timeoutMessageVisible = true;
-                    // Do NOT reload automatically here
-                }
-            }, 1000);
-        },
-        resendOtp() {
-            this.isResending = true;
-            // TODO: Add your OTP resend logic here (e.g., API call)
-            console.log("Resending OTP...");
-
-            // Simulate delay before reload, or reload after successful resend
-            setTimeout(() => {
-                window.location.reload();
-            }, 3000);
-        },
-    },
-    mounted() {
-        this.startTimer();
-    },
-    beforeUnmount() {
-        if (this.timerInterval) clearInterval(this.timerInterval);
-    },
-};
-</script>
-
 
 <style scoped>
 body {

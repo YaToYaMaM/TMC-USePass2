@@ -33,8 +33,19 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = Auth::user();
+
+        // Redirect based on role
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        } elseif ($user->role === 'guard') {
+            return redirect()->route('guard.ghome');
+        }
+
+        // fallback redirect if role is unknown
+        return redirect('/');
     }
+
 
     /**
      * Destroy an authenticated session.

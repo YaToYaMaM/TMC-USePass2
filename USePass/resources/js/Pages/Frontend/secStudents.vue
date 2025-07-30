@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted  } from 'vue';
 import  Frontend from "@/Layouts/FrontendLayout.vue";
 import { Head } from "@inertiajs/vue3";
+import axios from 'axios';
+import Swal from 'sweetalert2';
+
 
 
 const showModal = ref(false);
@@ -11,46 +14,194 @@ const importFileInput = ref<HTMLInputElement | null>(null);
 const selectedLocation = ref('Tagum');
 const showParentModal = ref(false);
 
-function submitForm() {
-    alert('student saved!');
-    showModal.value = false;
-}
 function handleImageUpload(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (file) {
         selectedImage.value = file;
         imagePreview.value = URL.createObjectURL(file);
+        form.value.students_profile_image = file;
     }
 }
 
 function triggerImport() {
     importFileInput.value?.click();
 }
-
 function handleImportFile(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
+
     if (file) {
-        alert(`Imported file: ${file.name}`);
-        // You can add logic here to upload it or read its content
+        const formData = new FormData();
+        formData.append('file', file);
+
+        axios.post('/students/import', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        })
+            .then(response => {
+                alert('Import successful: ' + response.data.message);
+
+            })
+            .catch(error => {
+                console.error('Import error:', error);
+                if (error.response?.status === 422) {
+                    alert('Validation error: Invalid file format or content.');
+                } else {
+                    alert('Something went wrong during import.');
+                }
+            });
     }
 }
-// Mock student list (you can fetch this from a backend later)
-const students = ref([
-    { id: 1, name: "Froilan Canete", title: "Information Technology" },
-    { id: 2, name: "Marvin Dela Cruz", title: "BS English" },
-    { id: 3, name: "Carlos Reyes", title: "BS Math" },
-    { id: 4, name: "Ronald Sison", title: "Information Technology" },
-    { id: 5, name: "Elmer Santos", title: "BS Math" },
-    { id: 6, name: "Benjie Ramos", title: "BS English" },
-    { id: 7, name: "Jake Garcia", title: "BS English" },
-]);
+
+const students = ref<any[]>([]);
+
+const fetchStudents = () => {
+    axios.get('/students/list')
+        .then((response) => {
+            students.value = response.data.map((student: any) => ({
+                students_id: student.students_id,
+                students_first_name: student.students_first_name,
+                students_middle_initial: student.students_middle_initial,
+                students_last_name: student.students_last_name,
+                students_program: student.students_program,
+                students_major: student.students_major,
+                students_profile_image: student.students_profile_image,
+            }));
+        })
+        .catch((error) => {
+            console.error('Error fetching students:', error);
+        });
+};
+
+onMounted(() => {
+    fetchStudents();
+    setInterval(fetchStudents, 5000);
+});
+
+
+const form = ref({
+    students_last_name: '',
+    students_first_name: '',
+    students_middle_initial: '',
+    students_gender: '',
+    students_id: '',
+    students_program: '',
+    students_major: '',
+    students_unit: '',
+    students_email: '',
+    students_phone_num: '',
+    students_profile_image: null,
+
+    parent_last_name: '',
+    parent_first_name: '',
+    parent_middle_initial: '',
+    parent_phone_num: '',
+    parent_email: '',
+    parent_relation: '',
+});
+
+const majorsByProgram = {
+    'Information Technology': ['Information Security'],
+    'Education': [
+        'Elementary Education',
+        'Early Childhood Education',
+        'Special Needs Education',
+
+    ],
+    'Secondary Education':[
+        'English',
+        'Mathematics',
+        'Filipino',
+    ],
+    'Engineering': [
+        'Land and Water Resources',
+        'Machinery and Power',
+        'Process Engineering',
+        'Structures and Environment',
+    ],
+    'TVL Teacher Education':[
+        'Agricultural Crops Technology',
+        'Animal Production',
+    ],
+};
+
+const filteredMajors = computed(() => {
+    return majorsByProgram[form.value.students_program] || [];
+});
+
+async function submitForm() {
+    const formData = new FormData();
+    for (const key in form.value) {
+        if (form.value[key] !== null) {
+            formData.append(key, form.value[key]);
+        }
+    }
+
+    try {
+        await axios.post('/students', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }).then(response => {
+            console.log('Success', response);
+        })
+            .catch(error => {
+                if (error.response && error.response.status === 422) {
+                    const errors = error.response.data.errors;
+                    console.error("Validation Errors:");
+                    for (const field in errors) {
+                        console.error(`${field}: ${errors[field].join(', ')}`);
+                    }
+                } else {
+                    console.error("Other error:", error);
+                }
+            });
+        await Swal.fire({
+            icon: 'success',
+            title: 'Saved!',
+            text: 'Student and parent have been saved successfully.',
+            confirmButtonColor: '#760000'
+        });
+
+        showModal.value = false;
+        showParentModal.value = false;
+
+        fetchStudents();
+    }
+    catch (error) {
+        if (error.response && error.response.status === 422) {
+            const errors = error.response.data.errors;
+            const errorMessages = Object.keys(errors)
+                .map(field => `${field}: ${errors[field].join(', ')}`)
+                .join('\n');
+
+            Swal.fire({
+                icon: 'warning',
+                title: 'Validation Error',
+                html: `<pre class="text-left whitespace-pre-wrap">${errorMessages}</pre>`,
+                confirmButtonColor: '#760000'
+            });
+        }
+        else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Something went wrong!',
+                text: 'Please try again later.',
+                confirmButtonColor: '#760000'
+            });
+        }
+
+    }
+
+
+}
 
 const currentPage = ref(1);
 const studentsPerPage = 4;
 
-const paginatedstudents = computed(() => {
+
+const paginatedStudents = computed(() => {
     const start = (currentPage.value - 1) * studentsPerPage;
-    return students.value.slice(start, start + studentsPerPage);
+    const end = start + studentsPerPage;
+    return filteredStudents.value.slice(start, end);
 });
 
 const totalPages = computed(() =>
@@ -72,11 +223,38 @@ function backToStudentForm() {
     showParentModal.value = false;
     showModal.value = true;
 }
+
+const selectedProgram = ref('');
+const searchQuery = ref('');
+
+
+const filteredStudents = computed(() => {
+    let result = students.value;
+
+    if (selectedProgram.value) {
+        const majors = majorsByProgram[selectedProgram.value] || [];
+        result = result.filter(student =>
+            majors.includes(student.students_major)
+        );
+    }
+
+    // Filter by search query
+    if (searchQuery.value) {
+        const query = searchQuery.value.toLowerCase();
+        result = result.filter(student =>
+            student.students_first_name.toLowerCase().includes(query) ||
+            student.students_last_name.toLowerCase().includes(query)
+        );
+    }
+
+    return result;
+});
+
 </script>
 
 <template>
     <Frontend>
-        <Head title="student Page" />
+        <Head title="Student Page" />
         <div class="flex flex-col p-3 ">
 
             <!-- Top Control Buttons -->
@@ -129,12 +307,14 @@ function backToStudentForm() {
                     <select class="border border-gray-300 p-2 w-full md:w-24 rounded text-sm">
                         <option>Active</option>
                         <option>Inactive</option>
+                        <option>Disabled</option>
                     </select>
                 </div>
                 <div class="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
 
                     <div class="relative w-full md:w-64">
                         <input
+                            v-model="searchQuery"
                             type="text"
                             placeholder="Search a student..."
                             class="w-full border border-gray-300 pl-10 pr-4 py-2 rounded-3xl focus:outline-none"
@@ -148,19 +328,34 @@ function backToStudentForm() {
                             </svg>
                         </div>
                     </div>
-                    <select class="border border-gray-300 p-2 w-fit min-w-[350px] text-sm rounded-lg">
-                        <option class="whitespace-nowrap">Bachelor of Science in Information Technology</option>
-                        <option class="whitespace-nowrap">Bachelor of Science in Early Childhood Education</option>
+                    <select v-model="selectedProgram" class="border border-gray-300 p-2 w-fit min-w-[350px] text-sm rounded-lg">
+                        <option value="">All Programs</option>
+                        <option value="Information Technology" class="whitespace-nowrap" >Bachelor of Science in Information Technology</option>
+                        <option value="Education" class="whitespace-nowrap">Bachelor of Education</option>
+                        <option value="Secondary Education" class="whitespace-nowrap">Bachelor of Secondary Education</option>
+                        <option value="TVL Teacher Education" class="whitespace-nowrap">Bachelor of Technical Vocational Teacher Education</option>
+                        <option value="Engineering" class="whitespace-nowrap">Bachelor of Science in Agricultural Biosystem Engineering</option>
                     </select>
                 </div>
             </div>
+            <div v-if="filteredStudents.length === 0" class="text-gray-500 p-4 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                No records found.
+            </div>
             <!-- student Card -->
-            <div v-for="student in paginatedstudents" :key="student.id" class="bg-white rounded-lg shadow-md p-4 flex flex-col md:flex-row items-center justify-between mt-5 gap-4">
+            <div v-for="student in paginatedStudents" :key="student.students_id" class="bg-white rounded-lg shadow-md p-4 flex flex-col md:flex-row items-center justify-between mt-5 gap-4">
                 <div class="flex items-center gap-4">
-                    <img src="@/Icons/students.png" alt="student Image" class="h-14 w-14 rounded-full border" />
+                    <img :src="`/${student.students_profile_image}`" class="h-14 w-14 rounded-full border" alt="Student Image" />
                     <div>
-                        <h2 class="text-[18px] font-bold">{{ student.name }}</h2>
-                        <p class="text-sm text-gray-600">{{ student.title }}</p>
+                        <h2 class="text-[18px] font-bold">
+                            {{ student.students_first_name }} {{student.students_middle_initial}} {{ student.students_last_name }}
+                        </h2>
+                        <p class="text-sm text-gray-600">
+                            Bachelor of {{ student.students_program }} Major in
+                            {{student.students_major}}
+                        </p>
                     </div>
                 </div>
 
@@ -220,19 +415,19 @@ function backToStudentForm() {
                         <div class="mb-4 flex space-x-4">
                             <div class="w-1/3">
                                 <label class="block text-sm font-medium mb-1">Last Name</label>
-                                <input type="text" class="w-full border border-gray-300 p-2 rounded" required />
+                                <input v-model="form.students_last_name" type="text" class="w-full border border-gray-300 p-2 rounded" required />
                             </div>
                             <div class="w-1/3">
                                 <label class="block text-sm font-medium mb-1">First Name</label>
-                                <input type="text" class="w-full border border-gray-300 p-2 rounded" required />
+                                <input v-model="form.students_first_name" type="text" class="w-full border border-gray-300 p-2 rounded" required />
                             </div>
                             <div class="w-1/12">
                                 <label class="block text-sm font-medium mb-1">M.I</label>
-                                <input type="text" class="w-full border border-gray-300 p-2 rounded" required />
+                                <input v-model="form.students_middle_initial" type="text" class="w-full border border-gray-300 p-2 rounded"  maxlength="1" required />
                             </div>
                             <div class="w-1/6">
                                 <label class="block text-sm font-medium mb-1">Gender</label>
-                                <select class="w-full border border-gray-300 p-2 rounded" required>
+                                <select v-model="form.students_gender" class="w-full border border-gray-300 p-2 rounded" required>
                                     <option value="" disabled selected>Select gender</option>
                                     <option value="male">Male</option>
                                     <option value="female">Female</option>
@@ -245,43 +440,48 @@ function backToStudentForm() {
 
                             <div class="w-1/3">
                                 <label class="block text-sm font-medium mb-1">ID Number</label>
-                                <input type="text" class="w-full border border-gray-300 p-2 rounded" required />
+                                <input v-model="form.students_id" type="text" class="w-full border border-gray-300 p-2 rounded" required />
                             </div>
                             <div class="w-1/3">
                                 <label class="block text-sm font-medium mb-1">Program</label>
-                                <select class="w-full border border-gray-300 p-2 w-fit min-w-[155px] rounded" required>
+                                <select v-model="form.students_program" class="w-full border border-gray-300 p-2 w-fit min-w-[155px] rounded" required>
                                     <option value="" disabled selected>Select Program</option>
-                                    <option value="male">Information Technology</option>
-                                    <option value="female">Education</option>
-                                    <option value="other">Engeneering</option>
+                                    <option value="Information Technology">Information Technology</option>
+                                    <option value="Education">Education</option>
+                                    <option value="Secondary Education">Secondary Education</option>
+                                    <option value="Engineering">Engineering</option>
+                                    <option value="TVL Teacher Education">TVL Teacher Education</option>
                                 </select>
                             </div>
                             <div class="w-1/3">
                                 <label class="block text-sm font-medium mb-1">Major</label>
-                                <select class="w-full border border-gray-300 p-2 w-fit min-w-[155px] rounded" required>
-                                    <option value="" disabled selected>Select Major</option>
-                                    <option value="male">Information Security</option>
-                                    <option value="female">Elementary Education</option>
-                                    <option value="other">Early Childhood Education</option>
+                                <select v-model="form.students_major"
+                                        class="w-full border border-gray-300 p-2 w-fit min-w-[155px] rounded"
+                                        :disabled="!form.students_program" required>
+                                    <option  value="" disabled selected>Select Major</option>
+                                    <option v-for="major in filteredMajors" :key="major" :value="major">
+                                        {{ major }}
+                                    </option>
+
                                 </select>
                             </div>
                             <div class="w-1/3">
                                 <label class="block text-sm font-medium mb-1">Unit</label>
-                                <select class="w-full border border-gray-300 p-2 w-fit min-w-[100px] rounded" required>
+                                <select v-model="form.students_unit" class="w-full border border-gray-300 p-2 w-fit min-w-[100px] rounded" required>
                                     <option value="" disabled selected>Select Unit</option>
-                                    <option value="male">Tagum</option>
-                                    <option value="female">Mabini</option>
+                                    <option value="Tagum">Tagum</option>
+                                    <option value="Mabini">Mabini</option>
                                 </select>
                             </div>
                         </div>
                         <div class="mb-4 flex space-x-4">
                             <div class="w-1/2">
                                 <label class="block text-sm font-medium mb-1">Email</label>
-                                <input type="Text" class="w-full border border-gray-300 p-2 rounded" required />
+                                <input v-model="form.students_email" type="Text" class="w-full border border-gray-300 p-2 rounded" required />
                             </div>
                             <div class="w-1/2">
                                 <label class="block text-sm font-medium mb-1">Contact Number</label>
-                                <input type="text" class="w-full border border-gray-300 p-2 rounded" required />
+                                <input v-model="form.students_phone_num" type="text" class="w-full border border-gray-300 p-2 rounded" required />
                             </div>
                         </div>
 
@@ -342,14 +542,15 @@ function backToStudentForm() {
                             <p class="text-sm font-medium mb-2">Parent/Guardian</p>
 
                             <div class="mb-2 flex gap-2">
-                                <input type="text" placeholder="Last Name" class="w-1/3 border border-gray-300 p-2 rounded text-sm" required />
-                                <input type="text" placeholder="First Name" class="w-1/3 border border-gray-300 p-2 rounded text-sm" required />
-                                <input type="text" placeholder="M.I" class="w-1/6 border border-gray-300 p-2 rounded text-sm" />
+                                <input v-model="form.parent_last_name" type="text" placeholder="Last Name" class="w-1/3 border border-gray-300 p-2 rounded text-sm" required />
+                                <input v-model="form.parent_first_name" type="text" placeholder="First Name" class="w-1/3 border border-gray-300 p-2 rounded text-sm" required />
+                                <input v-model="form.parent_middle_initial" type="text" placeholder="M.I" class="w-1/6 border border-gray-300 p-2 rounded text-sm"  maxlength="1" />
                             </div>
 
                             <div class="mb-4 flex gap-2">
-                                <input type="text" placeholder="Contact Number" class="w-1/2 border border-gray-300 p-2 rounded text-sm" required />
-                                <select class="w-1/2 border border-gray-300 p-2 rounded text-sm" required>
+                                <input v-model="form.parent_phone_num" type="text" placeholder="Contact #" class="w-1/3 border border-gray-300 p-2 rounded text-sm" required />
+                                <input v-model="form.parent_email" type="text" placeholder="Email" class="w-1/2 border border-gray-300 p-2 rounded text-sm" required />
+                                <select v-model="form.parent_relation" class="w-1/4 border border-gray-300 p-2 rounded text-sm" required>
                                     <option value="" disabled selected>Relationship</option>
                                     <option value="father">Father</option>
                                     <option value="mother">Mother</option>

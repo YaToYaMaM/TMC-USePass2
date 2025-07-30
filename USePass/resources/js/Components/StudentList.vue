@@ -1,8 +1,8 @@
 <template>
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-lg shadow p-6 w-full">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold">Students</h3>
-            <a href="#" class="text-blue-500 text-sm">See All</a>
+            <a href="/students" class="text-blue-500 text-sm">See All</a>
         </div>
         <ul>
             <li v-for="(student, index) in students" :key="index" class="flex items-center space-x-3 mb-3">

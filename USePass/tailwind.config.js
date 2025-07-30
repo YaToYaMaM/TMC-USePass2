@@ -14,12 +14,14 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                bookman: ['"Bookman Old Style"', '"Libre Baskerville"', 'serif'],
             },
             colors:{
                  customRed: '#760000'
             },
         },
     },
+
 
     plugins: [forms],
 };
