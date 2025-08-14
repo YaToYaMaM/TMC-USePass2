@@ -26,32 +26,39 @@ function handleImageUpload(event: Event) {
 function triggerImport() {
     importFileInput.value?.click();
 }
-function handleImportFile(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
 
-    if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
+const handleImportFile = async () => {
+    if (!importFileInput.value?.files?.length) return;
 
-        axios.post('/students/import', formData, {
+    const formData = new FormData();
+    formData.append('file', importFileInput.value.files[0]); // must be 'file'
+
+    try {
+        await axios.post('/students/import', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
-        })
-            .then(response => {
-                alert('Import successful: ' + response.data.message);
+        });
 
-            })
-            .catch(error => {
-                console.error('Import error:', error);
-                if (error.response?.status === 422) {
-                    alert('Validation error: Invalid file format or content.');
-                } else {
-                    alert('Something went wrong during import.');
-                }
-            });
+        Swal.fire({
+            icon: 'success',
+            title: 'Import Successful',
+            text: 'The student data has been successfully imported.',
+            confirmButtonColor: '#3085d6',
+        });
+    } catch (error) {
+        console.error("Import error:", error);
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Import Failed',
+            text: 'There was an unexpected error during the import.',
+            confirmButtonColor: '#d33',
+        });
     }
-}
+};
+
+
 
 const students = ref<any[]>([]);
 
@@ -255,7 +262,7 @@ const filteredStudents = computed(() => {
 <template>
     <Frontend>
         <Head title="Student Page" />
-        <div class="flex flex-col p-3 ">
+        <div class="flex flex-col p-3 px-12 pt-8">
 
             <!-- Top Control Buttons -->
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
@@ -265,11 +272,11 @@ const filteredStudents = computed(() => {
                     <button @click="triggerImport" class="px-3 py-1 text-sm bg-green-500 text-white rounded">Import</button>
 
                     <!-- Button Group -->
-                    <div class="inline-flex justify-center text-[0.775rem] bg-gray-100 p-0.5 rounded-md shadow max-w-fit ">
+                    <div class="inline-flex px-1 py-1 justify-center text-[0.775rem] bg-gray-100 p-0.5 rounded-md shadow max-w-fit ">
                         <button
                             @click="selectedLocation = 'Tagum'"
                             :class="[
-        'px-3 py-1 text-sm border-r border-gray-300',
+        'px-3 py-1 text-sm border-r border-gray-300 rounded-[5px]',
         selectedLocation === 'Tagum'
           ? 'bg-white text-black shadow'
           : 'bg-transparent text-black'
@@ -280,7 +287,7 @@ const filteredStudents = computed(() => {
                         <button
                             @click="selectedLocation = 'Mabini'"
                             :class="[
-        'px-3 py-1 text-sm',
+        'px-3 py-1 text-sm rounded-[5px]',
         selectedLocation === 'Mabini'
           ? 'bg-white text-black shadow'
           : 'bg-transparent text-black'

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use App\Models\Student;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ParentCredential;
 use App\Imports\StudentsImport;
+use Maatwebsite\Excel\Facades\Excel;
 class StudentController extends Controller
 {
     public function store(Request $request)
@@ -71,6 +73,14 @@ class StudentController extends Controller
 
         // Save parent
         ParentCredential::create($validatedParent);
+        $fullName = trim($student->students_first_name . ' ' . ($student->students_middle_initial ?? '') . ' ' . $student->students_last_name);
+
+        $this->logActivity(
+            $request->user()->id ?? null, // Assuming you have authenticated user, use null if not
+            $request->user()->role ?? 'System', // Get user role or default to 'System'
+            'Student Created',
+            "New Student Added: Student ID: {$student->students_id}: {$fullName}"
+        );
 
         return response()->json(['message' => 'Saved successfully.']);
     }
@@ -81,6 +91,13 @@ class StudentController extends Controller
         ]);
 
         Excel::import(new StudentsImport, $request->file('file'));
+
+        $this->logActivity(
+            $request->user()->id ?? null, // Assuming you have authenticated user, use null if not
+            $request->user()->role ?? 'System', // Get user role or default to 'System'
+            'Student Import',
+            "Importing Students Information"
+        );
 
         return response()->json(['message' => 'Import successful']);
     }
@@ -169,5 +186,55 @@ class StudentController extends Controller
         return response()->json($results);
     }
 
+    public function show($id)
+    {
+        $student = Student::where('students_id', $id)->first();
+
+        if ($student) {
+            // Compose full name manually since you store first, last, middle separately
+            $fullName = trim($student->students_first_name . ' ' . ($student->students_middle_initial ?? '') . ' ' . $student->students_last_name);
+
+            return response()->json([
+                'exists' => true,
+                'student' => [
+                    'full_name' => $fullName,
+                    'course' => $student->students_program,
+                    'id_number' => $student->students_id,
+                    'profile_image' => $student->students_profile_image,
+                ],
+            ]);
+        } else {
+            return response()->json(['exists' => false]);
+        }
+    }
+    public function fetchStudentProfile($students_id)
+    {
+        $student = \App\Models\Student::select(
+            'students_id as id',
+            \DB::raw("CONCAT(students_first_name, ' ', students_middle_initial, ' ', students_last_name) as fullName"),
+            'students_program as program',
+            'students_profile_image as profileImage'
+        )->where('students_id', $students_id)->first();
+
+        return response()->json([
+            'exists' => $student !== null,
+            'student' => $student,
+        ]);
+    }
+
+    private function logActivity($userId, $role, $action, $description)
+    {
+        try {
+            ActivityLog::create([
+                'user_id' => $userId,
+                'role' => $role,
+                'log_action' => $action,
+                'log_description' => $description,
+            ]);
+        } catch (\Exception $e) {
+            // Log to Laravel's default log if activity logging fails
+            \Log::error('Failed to create activity log: ' . $e->getMessage());
+        }
+    }
 
 }

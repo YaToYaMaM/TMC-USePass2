@@ -39,7 +39,8 @@ class CustomForgotPasswordController extends Controller
         $request->validate([
             'email' => 'required|email',
             'phone' => 'required|string',
-            'student_id' => 'required|string'
+            'student_id' => 'required|string',
+            'profile_image' => 'nullable|image|max:5120'
         ]);
 
         // Verify student exists
@@ -47,6 +48,22 @@ class CustomForgotPasswordController extends Controller
 
         if (!$student) {
             return response()->json(['error' => 'Student not found'], 404);
+        }
+
+        $imagePath = null;
+        if ($request->hasFile('profile_image')) {
+            $image = $request->file('profile_image');
+            $imageName = time() . '_' . $image->getClientOriginalName();
+            $destinationPath = public_path('profile_pictures');
+
+            if (!file_exists($destinationPath)) {
+                mkdir($destinationPath, 0755, true);
+            }
+
+            $image->move($destinationPath, $imageName);
+            $imagePath = 'profile_pictures/' . $imageName;
+
+            $student->update(['students_profile_image' => $imagePath]);
         }
 
         $otp = rand(100000, 999999);
@@ -63,7 +80,8 @@ class CustomForgotPasswordController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OTP sent successfully',
-            'otp_start_time' => now()
+            'otp_start_time' => now(),
+            'profile_image_uploaded' => $imagePath ? true : false
         ]);
     }
 
@@ -194,28 +212,27 @@ class CustomForgotPasswordController extends Controller
                 // Original forgot password logic
                 $user = User::where('email', Session::get('otp_email'))->first();
                 if (!$user) {
-                    return response()->json([
-                        'success' => false,
-                        'error' => 'No user found for this email'
-                    ], 422);
+                    return back()->withErrors(['otp' => 'No user found for this email']);
                 }
 
                 $token = Password::getRepository()->create($user);
+                Session::forget(['otp', 'otp_start_time', 'otp_purpose', 'otp_email']);
 
-                return response()->json([
-                    'success' => true,
-                    'redirect_url' => route('password.reset', [
-                        'token' => $token,
-                        'email' => $user->email,
-                    ])
+                return redirect()->route('password.reset', [
+                    'token' => $token,
+                    'email' => $user->email,
                 ]);
             }
         }
 
-        return response()->json([
-            'success' => false,
-            'error' => 'Invalid OTP code'
-        ], 422);
+        if (Session::get('otp_purpose', 'forgot_password') === 'student_auth') {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid OTP code'
+            ], 422);
+        } else {
+            return back()->withErrors(['otp' => 'Invalid OTP code']);
+        }
     }
 
     // Add method to save student and parent data
@@ -224,8 +241,19 @@ class CustomForgotPasswordController extends Controller
         try {
             $request->validate([
                 'student_id' => 'required|string',
-                'parent_email' => 'required|email',
-                'parent_phone' => 'required|string'
+                'parent_first_name' => 'required|string|max:100',
+                'parent_middle_initial' => 'nullable|string|max:1',
+                'parent_last_name' => 'required|string|max:100',
+                'parent_relation' => 'required|string|max:50',
+                'parent_email' => 'required|email|max:100',
+                'parent_phone' => 'required|string|max:20'
+            ], [
+                'parent_first_name.required' => 'Parent first name is required',
+                'parent_last_name.required' => 'Parent last name is required',
+                'parent_relation.required' => 'Parent relationship is required',
+                'parent_email.required' => 'Parent email is required',
+                'parent_email.email' => 'Please enter a valid email address',
+                'parent_phone.required' => 'Parent phone number is required'
             ]);
 
             // Debug logging
@@ -260,6 +288,10 @@ class CustomForgotPasswordController extends Controller
             // Handle parent data
             $parentData = [
                 'students_id' => $request->student_id,
+                'parent_first_name' => $request->parent_first_name,
+                'parent_middle_initial' => $request->parent_middle_initial,
+                'parent_last_name' => $request->parent_last_name,
+                'parent_relation' => $request->parent_relation,
                 'parent_email' => $request->parent_email,
                 'parent_phone_num' => $request->parent_phone,
             ];

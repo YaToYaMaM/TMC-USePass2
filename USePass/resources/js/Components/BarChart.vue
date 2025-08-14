@@ -1,6 +1,6 @@
 <template>
     <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Students by Course</h3>
+        <h3 class="text-lg font-semibold mb-4">Students by Program</h3>
         <Bar v-if="chartData" :data="chartData" :options="chartOptions" />
         <div v-else>Loading chart...</div>
     </div>

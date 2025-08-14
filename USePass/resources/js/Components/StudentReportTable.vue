@@ -23,7 +23,6 @@ const studentRecords = ref<StudentRecord[]>([]);
 const attendanceFilter = ref("");
 const currentPage = ref(1);
 const itemsPerPage = 8;
-const loading = ref(false);
 const error = ref("");
 
 function formatTime(timeString: string): string {
@@ -83,10 +82,6 @@ function formatDate(dateString: string): string {
 }
 
 const fetchStudentRecords = () => {
-    // Only show loading on initial load, not on auto-refresh
-    if (studentRecords.value.length === 0) {
-        loading.value = true;
-    }
     error.value = '';
 
     axios.get('/student-records', {
@@ -111,7 +106,7 @@ const fetchStudentRecords = () => {
         .catch((err) => {
             console.error('Error fetching student records:', err);
             error.value = 'Failed to load student records. Please try again.';
-        })
+        });
 };
 
 watch(() => props.selectedDate, fetchStudentRecords, { immediate: true });
@@ -217,21 +212,8 @@ const prevPage = () => {
             </div>
         </div>
 
-        <!-- Loading State - Only show on initial load -->
-        <div v-if="loading && studentRecords.length === 0" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-            <div class="flex items-center justify-center">
-                <div class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700">
-                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading records...
-                </div>
-            </div>
-        </div>
-
         <!-- Error State -->
-        <div v-else-if="error" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div v-if="error" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             <div class="text-center">
                 <div class="text-red-600 text-sm font-medium">{{ error }}</div>
                 <button @click="fetchStudentRecords" class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
@@ -411,13 +393,114 @@ const prevPage = () => {
         display: none !important;
     }
 
+    /* Print-specific styles */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    body {
+        margin: 0 !important;
+        padding: 20px !important;
+    }
+
     .bg-white {
         background-color: white !important;
     }
 
     .shadow-sm,
-    .shadow-md {
+    .shadow-md,
+    .rounded-xl,
+    .rounded-lg {
         box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+
+    /* Table print styles */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto !important;
+        font-size: 12px !important;
+    }
+
+    thead {
+        display: table-header-group !important;
+        background-color: #f9fafb !important;
+    }
+
+    tbody {
+        display: table-row-group !important;
+    }
+
+    tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+    }
+
+    th, td {
+        border: 1px solid #e5e7eb !important;
+        padding: 8px 6px !important;
+        text-align: left !important;
+        word-wrap: break-word !important;
+    }
+
+    th {
+        background-color: #f9fafb !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        color: #374151 !important;
+    }
+
+    td {
+        font-size: 11px !important;
+        color: #111827 !important;
+    }
+
+    /* Adjust column widths for better print layout */
+    th:nth-child(1), td:nth-child(1) { width: 20% !important; } /* Student */
+    th:nth-child(2), td:nth-child(2) { width: 18% !important; } /* Program & Major */
+    th:nth-child(3), td:nth-child(3) { width: 12% !important; } /* Unit */
+    th:nth-child(4), td:nth-child(4) { width: 12% !important; } /* Time In */
+    th:nth-child(5), td:nth-child(5) { width: 12% !important; } /* Time Out */
+    th:nth-child(6), td:nth-child(6) { width: 12% !important; } /* Status */
+    th:nth-child(7), td:nth-child(7) { width: 14% !important; } /* Date */
+
+    /* Remove extra spacing and margins */
+    .space-y-6 > * + * {
+        margin-top: 0 !important;
+    }
+
+    .overflow-x-auto {
+        overflow: visible !important;
+    }
+
+    /* Print title styling */
+    .print-title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: #111827;
+    }
+
+    /* Hide empty state message in print */
+    .text-center.py-12 {
+        display: none !important;
+    }
+}
+
+/* Add print title that only shows when printing */
+@media print {
+    .space-y-6::before {
+        content: "TMC Attendance Report";
+        display: block;
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: #111827;
     }
 }
 </style>

@@ -1,7 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Support\Facades\Session;
+use App\Models\Student;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -33,9 +34,25 @@ class FrontendControllers extends Controller
         return Inertia::render('Frontend/Eotp');
     }
 
-    public function scan()
+//    public function scan()
+//    {
+//        return Inertia::render('Frontend/Gscan');
+//    }
+//
+//
+    public function guardHome()
     {
-        return Inertia::render('Frontend/Gscan');
+        return Inertia::render('Frontend/guardHome');
+    }
+
+    public function facultystaffAttendance()
+    {
+        return Inertia::render('Frontend/FacultyStaffAttendance');
+    }
+
+    public function checking()
+    {
+        return Inertia::render('Frontend/Checking');
     }
 
     public function ghome()
@@ -66,6 +83,10 @@ class FrontendControllers extends Controller
         $studentHasContact = $request->boolean('studentHasContact', false);
         $parentHasContact = $request->boolean('parentHasContact', false);
 
+        $step = $request->get('step', 1);
+        $mode = $request->get('mode', '');
+        $requiresOtp = $request->boolean('requiresOtp', false);
+
 
         if (!$studentData && Session::get('verified_student_id')) {
             $student = Student::where('students_id', Session::get('verified_student_id'))->first();
@@ -80,11 +101,21 @@ class FrontendControllers extends Controller
             }
         }
 
+        if ($mode === 'parent_update' && $studentData) {
+            Session::forget(['student_authenticated', 'verified_student_id', 'verified_student_email', 'verified_student_phone']);
+
+            $step = 1;
+            $requiresOtp = true;
+        }
+
         return Inertia::render('Frontend/Edetails', [
-            'studentData' => $request->studentData,
-            'parentData' => $request->parentData,
+            'studentData' => $studentData,
+            'parentData' => $parentData,
             'studentHasContact' => $studentHasContact,
             'parentHasContact' => $parentHasContact,
+            'step' => $step,
+            'mode' => $mode,
+            'requiresOtp' => $requiresOtp,
         ]);
     }
 
@@ -104,6 +135,20 @@ class FrontendControllers extends Controller
         return Inertia::render('Frontend/secStudents');
     }
 
+    public function facultyStaffHome()
+    {
+        return Inertia::render('Frontend/FacultyStaffHome');
+    }
+
+    public function facultynstaff()
+    {
+        return Inertia::render('Frontend/adminFacultyNStaff');
+    }
+    public function facultynstaffAttendance()
+    {
+        return Inertia::render('Frontend/secFacultyReport');
+    }
+
     public function statistics()
     {
         return Inertia::render('Frontend/secStatistics');
@@ -121,5 +166,21 @@ class FrontendControllers extends Controller
     public function incident()
     {
         return Inertia::render('Frontend/secIncident');
+    }
+
+    public function facultyRegistration()
+    {
+        return Inertia::render('Frontend/FacultyRegistration');
+    }
+
+    public function facultySuccess(Request $request)
+    {
+        return Inertia::render('Frontend/FacultySuccess', [
+            'facultyData' => $request->facultyData,
+        ]);
+    }
+
+    public function backupnRestore(){
+        return Inertia::render('Frontend/Backup&Restore');
     }
 }

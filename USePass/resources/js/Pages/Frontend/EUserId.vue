@@ -25,6 +25,7 @@
                 />
 
                 <button
+                    v-if="!isRedirecting && !hasClickedContinue"
                     @click="fetchStudentData"
                     :disabled="loading || !userId.trim()"
                     class="mt-4 bg-[#760000] hover:bg-green-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-semibold shadow w-full max-w-xs"
@@ -34,7 +35,7 @@
 
                 <!-- Status message -->
                 <div v-if="statusMessage" class="mt-4 p-3 rounded-md max-w-xs mx-auto" :class="statusMessageClass">
-                    <div class="text-sm font-medium">{{ statusMessage }}</div>
+                    <div class="text-sm font-medium text-green-500">{{ statusMessage }}</div>
                     <div v-if="statusDetails" class="text-xs mt-1 opacity-90">{{ statusDetails }}</div>
                 </div>
 
@@ -45,7 +46,7 @@
 
                 <!-- Proceed button (shown after status check) -->
                 <button
-                    v-if="canProceed"
+                    v-if="canProceed && !isRedirecting"
                     @click="proceedToDetails"
                     class="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md font-semibold shadow w-full max-w-xs"
                 >
@@ -66,6 +67,7 @@ export default {
             userId: "",
             loading: false,
             error: null,
+            hasClickedContinue: false,
             // Status tracking
             studentData: null,
             parentData: null,
@@ -73,6 +75,7 @@ export default {
             statusDetails: "",
             statusMessageClass: "",
             canProceed: false,
+            isRedirecting: false,
             redirectStep: 1,
 
             // Status flags
@@ -102,6 +105,7 @@ export default {
             this.error = null;
             this.statusMessage = "";
             this.canProceed = false;
+            this.hasClickedContinue = true;
 
             try {
                 const response = await axios.post('/student/get-data', {
@@ -118,13 +122,35 @@ export default {
                     this.parentHasContact = status.parent_has_contact;
                     this.redirectStep = status.redirect_step;
 
-                    // Set status message
                     this.statusMessage = status.message;
-                    this.setStatusDisplay();
 
-                    this.canProceed = true;
+                    // Auto-redirect if no contact info
+                    if (!this.studentHasContact && !this.parentHasContact) {
+                        this.isRedirecting = true;
+                        this.redirectStep = 1;
+                        this.$inertia.visit(`/Details?step=${this.redirectStep}`, {
+                            data: {
+                                studentData: this.studentData,
+                                parentData: this.parentData,
+                                studentHasContact: this.studentHasContact,
+                                parentHasContact: this.parentHasContact
+                            },
+                            method: 'get'
+                        });
+                    } else {
+                        // Display status info for partial or complete data
+                        this.setStatusDisplay();
+                        this.canProceed = true;
+                    }
+
+                }
+                else {
+                    // Reset flag if request failed
+                    this.hasClickedContinue = false;
                 }
             } catch (error) {
+
+                this.hasClickedContinue = false;
                 if (error.response?.status === 404) {
                     this.error = 'Student not found';
                 } else {
@@ -153,6 +179,19 @@ export default {
         proceedToDetails() {
             if (!this.canProceed) return;
 
+            if (this.studentHasContact && !this.parentHasContact) {
+                this.$inertia.visit(`/Details?step=1&mode=parent_update`, {
+                    data: {
+                        studentData: this.studentData,
+                        parentData: this.parentData,
+                        studentHasContact: this.studentHasContact,
+                        parentHasContact: this.parentHasContact,
+                        requiresOtp: true
+                    },
+                    method: 'get'
+                });
+                return;
+            }
 
             this.$inertia.visit(`/Details?step=${this.redirectStep}`, {
                 data: {

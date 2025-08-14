@@ -16,7 +16,7 @@ const downloadPDF = () => {
 
     html2pdf()
         .set({
-            margin: 0.5,
+            margin: 0.1,
             filename: 'attendance-report.pdf',
             html2canvas: {
                 scale: 2,
@@ -27,6 +27,33 @@ const downloadPDF = () => {
         .from(element)
         .save();
 };
+
+
+const majorsByProgram = {
+    'Information Technology': ['Information Security'],
+    'Education': [
+        'Elementary Education',
+        'Early Childhood Education',
+        'Special Needs Education',
+
+    ],
+    'Secondary Education':[
+        'English',
+        'Mathematics',
+        'Filipino',
+    ],
+    'Engineering': [
+        'Land and Water Resources',
+        'Machinery and Power',
+        'Process Engineering',
+        'Structures and Environment',
+    ],
+    'TVL Teacher Education':[
+        'Agricultural Crops Technology',
+        'Animal Production',
+    ],
+};
+
 
 </script>
 
@@ -72,7 +99,7 @@ const downloadPDF = () => {
 
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-center gap-4">
-                    <h1 class="text-xl font-bold">Reports</h1>
+                    <h1 class="text-xl font-bold">Student Reports</h1>
 
                 </div>
                 <div class="no-print flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">

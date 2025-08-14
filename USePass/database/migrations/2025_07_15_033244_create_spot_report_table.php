@@ -24,9 +24,11 @@ return new class extends Migration
             $table->text('findings');
             $table->string('team_leader');
             $table->string('guard_name');
+            $table->string('ssu_head')->nullable();
             $table->text('action_taken');
             $table->string('department_representative');
             $table->string('location')->nullable();
+            $table->json('spotPicture')->nullable();
             $table->time('time')->nullable();
             $table->date('date')->nullable();
             // Printing tracking

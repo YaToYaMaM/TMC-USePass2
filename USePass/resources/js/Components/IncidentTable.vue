@@ -5,23 +5,35 @@ import { usePage } from "@inertiajs/vue3";
 // Import Inertia's form helper for adding new reports
 import { useForm } from '@inertiajs/vue3';
 
+const selectedImages = ref<File[]>([]);
+const imagePreviews = ref<string[]>([]);
+
+function handleImageUpload(event: Event) {
+    const files = (event.target as HTMLInputElement).files;
+    if (files) {
+        selectedImages.value = Array.from(files);
+        imagePreviews.value = selectedImages.value.map(file => URL.createObjectURL(file));
+
+        // Optional: Assign to your report field (if needed to send to backend)
+        newReport.incidentPicture = selectedImages.value; // ✅ no `.value` needed for useForm
+
+    }
+}
+
+
 // Define the User interface with role property
 interface User {
     id: number;
-    name: string;
+    first_name: string;
+    last_name: string;
     email?: string;
     role: 'admin' | 'guard' | 'user';
-}
-
-// Extend the Inertia page props to include our User type
-interface PageProps {
-    auth: {
-        user: User;
-    };
+    name?: string; // Add name property for compatibility
 }
 
 const page = usePage();
-const currentUser = computed(() => page.props.auth.user as User & { role: string });
+// Fix the type assertion - remove the redundant intersection type
+const currentUser = computed(() => page.props.auth.user as User);
 
 const props = defineProps<{
     reports: any[];
@@ -29,12 +41,12 @@ const props = defineProps<{
 }>();
 
 const reports = ref(props.reports);
-const filteredReports = computed(() => {
-    return props.reports?.filter(report => {
-        // your filtering condition
-        return true; // modify as needed
-    }) ?? [];
-});
+// const filteredReports = computed(() => {
+//     return props.reports?.filter(report => {
+//         // your filtering condition
+//         return true; // modify as needed
+//     }) ?? [];
+// });
 
 // Utility function to format date as "Date | Time"
 function formatDateTime(dateString: string): string {
@@ -60,17 +72,32 @@ const showAddModal = ref(false);
 const selectedReport = ref<any>(null);
 
 // Form data for new report
-const newReport = ref({
+// const newReport = ref({
+//     description: '',
+//     // type: 'Incident Report',
+//     date: '',
+//     what: '',
+//     who: '',
+//     where: '',
+//     when: '',
+//     how: '',
+//     why: '',
+//     recommendation: '',
+//     incidentPicture: null,
+// });
+
+const newReport = useForm({
     description: '',
     type: 'Incident Report',
-    date: '',
+    date: new Date().toISOString().split('T')[0],
     what: '',
     who: '',
     where: '',
     when: '',
     how: '',
     why: '',
-    recommendation: ''
+    recommendation: '',
+    incidentPicture: null, // This can be an array if you're uploading multiple
 });
 
 // Form validation errors
@@ -109,65 +136,74 @@ function openAddModal() {
 }
 
 // Reset form data
+// function resetForm() {
+//     newReport.value = {
+//         description: '',
+//         type: 'Incident Report',
+//         date: new Date().toISOString().split('T')[0], // Set current date as default
+//         what: '',
+//         who: '',
+//         where: '',
+//         when: '',
+//         how: '',
+//         why: '',
+//         recommendation: '',
+//         incidentPicture: null,
+//     };
+//     formErrors.value = {};
+// }
 function resetForm() {
-    newReport.value = {
-        description: '',
-        type: 'Incident Report',
-        date: new Date().toISOString().split('T')[0], // Set current date as default
-        what: '',
-        who: '',
-        where: '',
-        when: '',
-        how: '',
-        why: '',
-        recommendation: ''
-    };
+    newReport.reset(); // ✅ This is the correct way
+    selectedImages.value = [];
+    imagePreviews.value = [];
     formErrors.value = {};
 }
+
 
 // Validate form
 function validateForm(): boolean {
     formErrors.value = {};
 
-    if (!newReport.value.description.trim()) {
+    if (!newReport.description.trim()) {
         formErrors.value.description = 'Description is required';
     }
 
-    if (!newReport.value.date.trim()) {
+    if (!newReport.date.trim()) {
         formErrors.value.date = 'Date is required';
     }
 
-    if (!newReport.value.what.trim()) {
+    if (!newReport.what.trim()) {
         formErrors.value.what = 'What field is required';
     }
 
-    if (!newReport.value.who.trim()) {
+    if (!newReport.who.trim()) {
         formErrors.value.who = 'Who field is required';
     }
 
-    if (!newReport.value.where.trim()) {
+    if (!newReport.where.trim()) {
         formErrors.value.where = 'Where field is required';
     }
 
-    if (!newReport.value.when.trim()) {
+    if (!newReport.when.trim()) {
         formErrors.value.when = 'When field is required';
     }
 
-    if (!newReport.value.how.trim()) {
+    if (!newReport.how.trim()) {
         formErrors.value.how = 'How field is required';
     }
 
-    if (!newReport.value.why.trim()) {
+    if (!newReport.why.trim()) {
         formErrors.value.why = 'Why field is required';
     }
 
-    if (!newReport.value.recommendation.trim()) {
+    if (!newReport.recommendation.trim()) {
         formErrors.value.recommendation = 'Recommendation is required';
     }
 
     return Object.keys(formErrors.value).length === 0;
 }
 
+// Submit new report
 // Submit new report
 function submitReport() {
     if (!validateForm()) {
@@ -179,23 +215,59 @@ function submitReport() {
         return;
     }
 
-    // Create new report object
-    const reportToAdd = {
-        id: Math.max(...reports.value.map(r => r.id)) + 1,
-        name: currentUser.value.name,
-        user_id: currentUser.value.id,
-        ...newReport.value
+    // ✅ Store the form data before submission (since form gets reset)
+    const formData = {
+        description: newReport.description,
+        what: newReport.what,
+        who: newReport.who,
+        where: newReport.where,
+        when: newReport.when,
+        how: newReport.how,
+        why: newReport.why,
+        recommendation: newReport.recommendation,
+        type: newReport.type,
+        date: newReport.date
     };
 
-    // Add to reports array
-    reports.value.unshift(reportToAdd);
+    newReport.post('/incident-report', {
+        forceFormData: true,
+        onSuccess: (page) => {
+            showAddModal.value = false;
 
-    // Close modal and reset form
-    showAddModal.value = false;
-    resetForm();
+            // ✅ If server returns the new report, add it to the local array
+            if (page.props && page.props.newReport) {
+                reports.value.unshift(page.props.newReport);
+            } else {
+                // ✅ Fallback: manually create the report object using stored form data
+                const newReportData = {
+                    id: Date.now(), // temporary ID
+                    guard_name: currentUser.value.name || `${currentUser.value.first_name} ${currentUser.value.last_name}`,
+                    user_id: currentUser.value.id,
+                    created_at: new Date().toISOString(),
+                    // ✅ Use the stored form data instead of the reset form
+                    description: formData.description,
+                    what: formData.what,
+                    who: formData.who,
+                    where: formData.where,
+                    when: formData.when,
+                    how: formData.how,
+                    why: formData.why,
+                    recommendation: formData.recommendation,
+                    type: formData.type,
+                    date: formData.date
+                };
+                reports.value.unshift(newReportData);
+            }
 
-    // Show success message
-    alert('Incident report created successfully!');
+            // ✅ Reset form after updating the reports array
+            resetForm();
+            alert('Incident report created successfully!');
+        },
+        onError: (errors) => {
+            console.error('Validation errors:', errors);
+            formErrors.value = errors;
+        }
+    });
 }
 
 function printReport() {
@@ -215,6 +287,7 @@ function printReport() {
         when: selectedReport.value.when,
         how: selectedReport.value.how,
         why: selectedReport.value.why,
+        incidentPicture: selectedReport.value.incidentPicture,
         recommendation: selectedReport.value.recommendation
     };
 
@@ -261,6 +334,110 @@ const getRoleDisplayName = computed(() => {
     }
 });
 
+// Add these new reactive variables to your existing refs
+const showImageModal = ref(false);
+const selectedImageUrl = ref('');
+
+// Update your existing getImageUrl function to handle more cases
+function getImageUrl(imagePath: string | string[]): string {
+    if (!imagePath) return '';
+
+    // Handle array case (get first image)
+    if (Array.isArray(imagePath)) {
+        if (imagePath.length === 0) return '';
+        imagePath = imagePath[0];
+    }
+
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        return imagePath;
+    }
+
+    // If it starts with storage/, return with leading slash
+    if (imagePath.startsWith('storage/')) {
+        return `/${imagePath}`;
+    }
+
+    // If it's a relative path starting with uploads/ or images/
+    if (imagePath.startsWith('uploads/') || imagePath.startsWith('images/')) {
+        return `/${imagePath}`;
+    }
+
+    // Otherwise, assume it's in storage directory
+    return `/storage/${imagePath}`;
+}
+
+// New function to open image in modal
+function openImageModal(imageUrl: string) {
+    selectedImageUrl.value = imageUrl;
+    showImageModal.value = true;
+}
+
+// Update your handleImageError function to be more robust
+function handleImageError(event: Event) {
+    const img = event.target as HTMLImageElement;
+    console.error('Failed to load image:', img.src);
+
+    // Try alternative paths
+    const originalSrc = img.src;
+
+    // If the current src includes /storage/, try without it
+    if (originalSrc.includes('/storage/')) {
+        const newSrc = originalSrc.replace('/storage/', '/');
+        if (newSrc !== originalSrc) {
+            img.src = newSrc;
+            return;
+        }
+    }
+
+    // If it doesn't include /storage/, try with it
+    if (!originalSrc.includes('/storage/')) {
+        const fileName = originalSrc.split('/').pop();
+        if (fileName) {
+            img.src = `/storage/uploads/${fileName}`;
+            return;
+        }
+    }
+
+    // Finally, set a placeholder or hide the image
+    img.style.display = 'none';
+
+    // Optionally, show an error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'flex items-center justify-center h-32 bg-gray-100 rounded border text-gray-500 text-sm';
+    errorDiv.innerHTML = `
+        <div class="text-center">
+            <svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p>Image could not be loaded</p>
+        </div>
+    `;
+    img.parentNode?.insertBefore(errorDiv, img);
+}
+
+// Debug function to check image data (you can call this in console)
+function debugImageData(report: any) {
+    console.log('Report data:', report);
+    console.log('incidentPicture:', report.incidentPicture);
+    console.log('Type of incidentPicture:', typeof report.incidentPicture);
+    console.log('Is array?', Array.isArray(report.incidentPicture));
+
+    if (typeof report.incidentPicture === 'string') {
+        console.log('Processed URL:', getImageUrl(report.incidentPicture));
+    } else if (Array.isArray(report.incidentPicture)) {
+        report.incidentPicture.forEach((img: string, index: number) => {
+            console.log(`Image ${index}:`, img, '-> Processed:', getImageUrl(img));
+        });
+    }
+}
+
+function handleImageLoad(event: Event) {
+    const img = event.target as HTMLImageElement;
+    console.log('Image loaded successfully:', img.src);
+}
+
 watch(filteredReport, () => {
     if (currentPage.value > totalPages.value && totalPages.value > 0) {
         currentPage.value = 1;
@@ -276,7 +453,7 @@ console.log('Reports received:', props.reports);
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4" v-if="currentUser">
         <div class="flex items-center justify-between">
             <div>
-                <h3 class="text-lg font-semibold text-blue-900">Welcome, {{ currentUser.name }}</h3>
+                <h3 class="text-lg font-semibold text-blue-900">Welcome, {{ currentUser.first_name }} {{ currentUser.last_name }}</h3>
                 <p class="text-sm text-blue-700">{{ getRoleDisplayName }}</p>
             </div>
             <div class="text-sm text-blue-600">
@@ -315,13 +492,13 @@ console.log('Reports received:', props.reports);
                 v-for="(item, index) in paginatedIncident"
                 :key="item.id || index"
                 :class="{
-                    'bg-green-50': currentUser && item.guardId === currentUser.id && currentUser.role === 'guard',
+                    'bg-green-50': currentUser && item.user_id === currentUser.id && currentUser.role === 'guard',
                 }"
             >
                 <td class="px-6 py-4 font-medium whitespace-nowrap">
                     {{ item.guard_name }}
                     <span
-                        v-if="currentUser && item.guardId === currentUser.id && currentUser.role === 'guard'"
+                        v-if="currentUser && item.user_id === currentUser.id && currentUser.role === 'guard'"
                         class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded"
                     >Your Report</span>
                 </td>
@@ -575,6 +752,35 @@ console.log('Reports received:', props.reports);
                         ></textarea>
                         <p v-if="formErrors.recommendation" class="text-red-500 text-xs mt-1">{{ formErrors.recommendation }}</p>
                     </div>
+
+                    <!-- Add picture -->
+                    <div class="mt-5 flex justify-center">
+                        <div class="w-full max-w-xs border-2 border-dashed border-gray-400 rounded-md p-6 flex flex-col items-center text-center">
+                            <!-- Upload Icon -->
+                            <svg class="w-10 h-10 text-gray-400 mb-2" fill="none" stroke="currentColor" stroke-width="2"
+                                 viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0-9l-3 3m3-3l3 3m-6-6a4 4 0 118 0 4 4 0 01-8 0z" />
+                            </svg>
+
+                            <!-- Upload Text -->
+                            <p class="text-sm font-medium text-gray-700">Upload Pictures</p>
+                            <p class="text-xs text-gray-500 mb-3">JPEG, JPG, PNG formats, up to 5MB each</p>
+
+                            <!-- Browse Files -->
+                            <label class="cursor-pointer inline-block px-4 py-1 bg-gray-200 rounded text-sm font-medium hover:bg-gray-300">
+                                Browse Files
+                                <input type="file" accept="image/*" multiple @change="handleImageUpload" class="hidden" />
+                            </label>
+
+                            <!-- Image Previews -->
+                            <div v-if="imagePreviews.length" class="mt-4 grid grid-cols-2 gap-2">
+                                <div v-for="(src, index) in imagePreviews" :key="index">
+                                    <img :src="src" alt="Preview" class="h-24 rounded border" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action Buttons -->
@@ -615,9 +821,9 @@ console.log('Reports received:', props.reports);
 
             <!-- Header -->
             <h2 class="text-2xl font-semibold text-gray-800 mb-6 border-b pb-2 pr-8">
-                {{ selectedReport.type === 'Incident Report' ? 'Incident Report Details' : 'Spot Report Details' }}
+                {{ selectedReport.type === 'Incident Report' ? 'Incident Report Details' : 'Incident Report Details' }}
                 <span
-                    v-if="currentUser && selectedReport.guardId === currentUser.id && currentUser.role === 'guard'"
+                    v-if="currentUser && selectedReport.user_id === currentUser.id && currentUser.role === 'guard'"
                     class="text-sm bg-green-100 text-green-800 px-2 py-1 rounded ml-2"
                 >Your Report</span>
             </h2>
@@ -652,6 +858,72 @@ console.log('Reports received:', props.reports);
                     <label class="font-bold text-lg block mb-2">Recommendation:</label>
                     <p class="text-gray-900">{{ selectedReport.recommendation }}</p>
                 </div>
+                <div class="md:col-span-2">
+                    <label class="font-bold text-lg block mb-2">Evidence:</label>
+
+                    <!-- Handle multiple images or single image -->
+                    <div v-if="selectedReport.incidentPicture && selectedReport.incidentPicture.length > 0" class="space-y-4">
+                        <!-- If incidentPicture is an array of images -->
+                        <div v-if="Array.isArray(selectedReport.incidentPicture)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div v-for="(image, index) in selectedReport.incidentPicture" :key="index" class="relative">
+                                <img
+                                    :src="getImageUrl(image)"
+                                    :alt="`Evidence ${index + 1} for ${selectedReport.description}`"
+                                    class="max-w-full h-auto rounded shadow border cursor-pointer hover:opacity-90 transition-opacity"
+                                    @error="handleImageError"
+                                    @load="handleImageLoad"
+                                    @click="openImageModal(getImageUrl(image))"
+                                />
+                                <p class="text-xs text-gray-500 mt-1">Evidence {{ index + 1 }}</p>
+                            </div>
+                        </div>
+
+                        <!-- If incidentPicture is a single image (string) -->
+                        <div v-else class="relative inline-block">
+                            <img
+                                :src="getImageUrl(selectedReport.incidentPicture)"
+                                :alt="`Evidence for ${selectedReport.description}`"
+                                class="max-w-full h-auto rounded shadow border cursor-pointer hover:opacity-90 transition-opacity"
+                                @error="handleImageError"
+                                @load="handleImageLoad"
+                                @click="openImageModal(getImageUrl(selectedReport.incidentPicture))"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- No evidence message -->
+                    <div v-else class="flex items-center justify-center h-32 bg-gray-50 rounded border-2 border-dashed border-gray-300">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <p class="text-gray-500 text-sm">No evidence images available</p>
+                        </div>
+                    </div>
+                    <!-- Add this Image Modal for full-screen viewing (add after your main modal) -->
+                    <div
+                        v-if="showImageModal"
+                        class="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-80 px-4"
+                        @click.self="showImageModal = false"
+                    >
+                        <div class="relative max-w-4xl max-h-[90vh] overflow-hidden">
+                            <button
+                                @click="showImageModal = false"
+                                class="absolute top-4 right-4 text-white hover:text-red-400 text-3xl font-bold focus:outline-none z-10 bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center"
+                                title="Close"
+                            >
+                                &times;
+                            </button>
+                            <img
+                                :src="selectedImageUrl"
+                                alt="Full size evidence"
+                                class="max-w-full max-h-full rounded shadow-2xl"
+                                @error="handleImageError"
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Action Buttons -->
@@ -663,7 +935,7 @@ console.log('Reports received:', props.reports);
                     Close
                 </button>
                 <button
-                    v-if="currentUser && currentUser.role === 'guard' && selectedReport.guardId === currentUser.id"
+                    v-if="currentUser && currentUser.role === 'guard' && selectedReport.user_id === currentUser.id"
                     @click="printReport"
                     class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition text-sm"
                 >

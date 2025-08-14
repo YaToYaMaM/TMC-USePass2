@@ -27,6 +27,7 @@ return new class extends Migration
             $table->text('how')->nullable();
             $table->text('why')->nullable();
             $table->text('recommendation')->nullable();
+            $table->json('incidentPicture')->nullable();
             $table->timestamps();
         });
     }

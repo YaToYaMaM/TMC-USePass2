@@ -12,6 +12,7 @@ const props = defineProps<{
         guardName: string;
         teamLeader: string;
         departmentRepresentative: string;
+        ssuHead: string;
     };
 }>();
 
@@ -111,7 +112,7 @@ onMounted(() => {
             <div>
                 <p>Noted:</p>
                 <br />
-                <p class="underline text-lg font-semibold">Celso Talarde</p>
+                <p class="underline text-lg font-semibold">{{report.ssuHead}}</p>
                 <p class="font-semibold">Head, SSU</p>
                 <p class="font-semibold">Date:____________________</p>
             </div>

@@ -219,45 +219,45 @@ const closeSidebarOnMobile = () => {
                     </a>
                 </li>
 
-                <!-- Scanner - Guard Only -->
-                <li v-if="isGuard" class="relative">
-                    <a
-                        href="/scan"
-                        :class="[
-                                'flex items-center p-3 rounded-xl transition-all duration-300 ease-in-out group relative overflow-hidden',
-                                isCollapsed ? 'justify-center' : 'space-x-3',
-                                isActiveRoute('/scan')
-                                    ? 'bg-[#760000] text-white shadow-lg transform scale-105'
-                                    : 'hover:bg-red-50 hover:text-[#760000] text-gray-700'
-                            ]"
-                    >
-                        <div
-                            v-if="isActiveRoute('/scan')"
-                            class="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"
-                        ></div>
+<!--                &lt;!&ndash; Scanner - Guard Only &ndash;&gt;-->
+<!--                <li v-if="isGuard" class="relative">-->
+<!--                    <a-->
+<!--                        href="/scan"-->
+<!--                        :class="[-->
+<!--                                'flex items-center p-3 rounded-xl transition-all duration-300 ease-in-out group relative overflow-hidden',-->
+<!--                                isCollapsed ? 'justify-center' : 'space-x-3',-->
+<!--                                isActiveRoute('/scan')-->
+<!--                                    ? 'bg-[#760000] text-white shadow-lg transform scale-105'-->
+<!--                                    : 'hover:bg-red-50 hover:text-[#760000] text-gray-700'-->
+<!--                            ]"-->
+<!--                    >-->
+<!--                        <div-->
+<!--                            v-if="isActiveRoute('/scan')"-->
+<!--                            class="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"-->
+<!--                        ></div>-->
 
-                        <div class="flex-shrink-0">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7a5 5 0 100 10 5 5 0 000-10z" />
-                            </svg>
-                        </div>
+<!--                        <div class="flex-shrink-0">-->
+<!--                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">-->
+<!--                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11a9 9 0 11-18 0 9 9 0 0118 0z" />-->
+<!--                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7a5 5 0 100 10 5 5 0 000-10z" />-->
+<!--                            </svg>-->
+<!--                        </div>-->
 
-                        <span
-                            v-if="!isCollapsed"
-                            class="font-medium truncate flex-1 transition-all duration-300"
-                        >
-                                Scanner
-                            </span>
+<!--                        <span-->
+<!--                            v-if="!isCollapsed"-->
+<!--                            class="font-medium truncate flex-1 transition-all duration-300"-->
+<!--                        >-->
+<!--                                Scanner-->
+<!--                            </span>-->
 
-                        <div
-                            v-if="isCollapsed"
-                            class="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50"
-                        >
-                            Scanner
-                        </div>
-                    </a>
-                </li>
+<!--                        <div-->
+<!--                            v-if="isCollapsed"-->
+<!--                            class="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50"-->
+<!--                        >-->
+<!--                            Scanner-->
+<!--                        </div>-->
+<!--                    </a>-->
+<!--                </li>-->
 
                 <!-- Security Guard Management - Admin only -->
                 <li v-if="isAdmin" class="relative">
@@ -351,6 +351,52 @@ const closeSidebarOnMobile = () => {
                     </a>
                 </li>
 
+                <!-- Faculty n' Staff Management - Admin only (Akselot) -->
+                <li v-if="isAdmin" class="relative">
+                    <a
+                        href="/faculty-and-staff"
+                        :class="[
+                                'flex items-center p-3 rounded-xl transition-all duration-300 ease-in-out group relative overflow-hidden',
+                                isCollapsed ? 'justify-center' : 'space-x-3',
+                                isActiveRoute('/faculty-and-staff')
+                                    ? 'bg-[#760000] text-white shadow-lg transform scale-105'
+                                    : 'hover:bg-red-50 hover:text-[#760000] text-gray-700'
+                            ]"
+                    >
+                        <div
+                            v-if="isActiveRoute('/faculty-and-staff')"
+                            class="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"
+                        ></div>
+
+                        <div class="flex-shrink-0">
+                            <img
+                                src="@/Icons/students.png"
+                                alt="Students Icon"
+                                width="20"
+                                height="20"
+                                :class="[
+                                    'transition-transform duration-300',
+                                    isActiveRoute('/faculty-and-staff') ? 'scale-110' : 'group-hover:scale-110'
+                                ]"
+                            />
+                        </div>
+
+                        <span
+                            v-if="!isCollapsed"
+                            class="font-medium truncate flex-1 transition-all duration-300"
+                        >
+                                Faculty and Staff
+                            </span>
+
+                        <div
+                            v-if="isCollapsed"
+                            class="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50"
+                        >
+                            Students
+                        </div>
+                    </a>
+                </li>
+
                 <!-- Statistics - Admin only -->
                 <li v-if="isAdmin" class="relative">
                     <a
@@ -417,14 +463,51 @@ const closeSidebarOnMobile = () => {
                             v-if="!isCollapsed"
                             class="font-medium truncate flex-1 transition-all duration-300"
                         >
-                                Attendance Reports
+                                Student Attendance
                             </span>
 
                         <div
                             v-if="isCollapsed"
                             class="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50"
                         >
-                            Attendance Reports
+                            Student Attendance
+                        </div>
+                    </a>
+                </li>
+                <li v-if="isAdmin" class="relative">
+                    <a
+                        href="/facultynstaffAttendance"
+                        :class="[
+                                'flex items-center p-3 rounded-xl transition-all duration-300 ease-in-out group relative overflow-hidden',
+                                isCollapsed ? 'justify-center' : 'space-x-3',
+                                isActiveRoute('/facultynstaffAttendance')
+                                    ? 'bg-[#760000] text-white shadow-lg transform scale-105'
+                                    : 'hover:bg-red-50 hover:text-[#760000] text-gray-700'
+                            ]"
+                    >
+                        <div
+                            v-if="isActiveRoute('/facultynstaffAttendance')"
+                            class="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full"
+                        ></div>
+
+                        <div class="flex-shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+
+                        <span
+                            v-if="!isCollapsed"
+                            class="font-medium truncate flex-1 transition-all duration-300"
+                        >
+                                Faculty Attendance
+                            </span>
+
+                        <div
+                            v-if="isCollapsed"
+                            class="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50"
+                        >
+                            Faculty Attendance
                         </div>
                     </a>
                 </li>

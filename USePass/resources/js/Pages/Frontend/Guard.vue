@@ -49,6 +49,7 @@ const form = ref({
     middle_initial: '',
     role: 'guard',
     contact_number: '',
+    email: '',
     password: '',
     password_confirmation: '',
     profile_image: null,
@@ -271,7 +272,9 @@ async function updateGuard() {
             <!-- Guard Card -->
             <div v-for="guard in paginatedGuards" :key="guard.id" class="bg-white rounded-lg shadow-md p-4 flex flex-col md:flex-row items-center justify-between mt-5 gap-4">
                 <div class="flex items-center gap-4">
-                    <img :src="`/${guard.profile_image}`" alt="Guard Image" class="h-14 w-14 rounded-full border" />
+                    <img :src="`/${guard.profile_image} || '/guard_profiles/guard_image.png'`"
+                         @error="(e) => ((e.target as HTMLImageElement).src = '/guard_profiles/guard_image.png')"
+                         alt="Guard Image" class="h-14 w-14 rounded-full border" />
                     <div>
                         <h2 class="text-[18px] font-bold">  {{ guard.first_name }} {{guard.middle_initial}} {{ guard.last_name }}</h2>
                         <p class="text-sm text-gray-600">Security Guard</p>

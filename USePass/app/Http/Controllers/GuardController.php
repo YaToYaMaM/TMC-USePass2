@@ -5,6 +5,7 @@ use App\Models\Guard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
+use App\Models\ActivityLog;
 
 
 class GuardController extends Controller
@@ -34,7 +35,7 @@ class GuardController extends Controller
             $imagePath = 'guard_profiles/' . $imageName;
         }
 
-        Guard::create([
+        $guard = Guard::create([
             'last_name' => $request->last_name,
             'first_name' => $request->first_name,
             'middle_initial' => $request->middle_initial,
@@ -45,8 +46,31 @@ class GuardController extends Controller
             'profile_image' => $imagePath,
         ]);
 
+        // Log the activity after successful creation
+        $this->logActivity(
+            $request->user()->id ?? null, // Assuming you have authenticated user, use null if not
+            $request->user()->role ?? 'System', // Get user role or default to 'System'
+            'Guard Created',
+            "New Guard Added: {$guard->first_name} {$guard->last_name}"
+        );
         return response()->json(['message' => 'Guard created successfully.']);
     }
+
+    private function logActivity($userId, $role, $action, $description)
+    {
+        try {
+            ActivityLog::create([
+                'user_id' => $userId,
+                'role' => $role,
+                'log_action' => $action,
+                'log_description' => $description,
+            ]);
+        } catch (\Exception $e) {
+            // Log to Laravel's default log if activity logging fails
+            \Log::error('Failed to create activity log: ' . $e->getMessage());
+        }
+    }
+
     public function index()
     {
         $guards = Guard::where('role', 'guard')->get();
@@ -67,6 +91,14 @@ class GuardController extends Controller
             'last_name' => $request->last_name,
             'contact_number' => $request->contact_number,
         ]);
+
+        // Log the activity after successful creation
+        $this->logActivity(
+            $request->user()->id ?? null, // Assuming you have authenticated user, use null if not
+            $request->user()->role ?? 'System', // Get user role or default to 'System'
+            'Guard Updated',
+            "Guard Updated Information: {$guard->first_name} {$guard->last_name}"
+        );
 
         return response()->json(['message' => 'Guard updated successfully.']);
     }

@@ -8,17 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function getCounts()
-    {
-        $studentsCount = DB::table('students')->count();
-
-        return response()->json([
-            'students' => $studentsCount,
-            'teachers' => 0,
-            'visitors' => 0,
-            'alumni' => 0,
-        ]);
-    }
     public function getCountsByCategory()
     {
         $categories = [
